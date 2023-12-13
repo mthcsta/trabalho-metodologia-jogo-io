@@ -6,14 +6,17 @@ const cors = require('cors'); // Importa o módulo cors
 const app = express();
 app.use(cors({ origin: '*' }));
 
-const players = {};
-
 const server = http.createServer(app);
 const io = socketIO(server, {
   cors: {
-    origin: '*'
+    origin: '*',
+    methods: ['GET', 'POST'],
+    allowedHeaders: ['my-custom-header'],
+    credentials: true
   }
 });
+
+const players = {};  // Certifique-se de declarar a variável players aqui
 
 
 const PORT = process.env.PORT || 3000;
@@ -27,15 +30,21 @@ io.on('connection', (socket) => {
 
   // Recebe o evento quando um jogador se conecta
   socket.on('join', (player) => {
-    players[socket.id] = player;
+    players[socket.id] = { position: player.position };
+        
+    // Informa o jogador recém-conectado sobre todos os jogadores existentes
+    socket.emit('updatePlayers', players);
+
+    // Informa a todos os jogadores sobre o novo jogador
     io.emit('updatePlayers', players);
   });
 
   // Recebe o evento quando um jogador move a nave
   socket.on('move', (position) => {
-    if (!players[socket.id]) return;
-    players[socket.id].position = position;
-    io.emit('updatePlayers', players);
+    if (players[socket.id]) {
+      players[socket.id].position = position;
+      io.emit('updatePlayers', players);
+    }
   });
 
   // Recebe o evento quando um jogador atira
