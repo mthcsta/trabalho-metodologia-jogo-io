@@ -30,7 +30,7 @@ io.on('connection', (socket) => {
 
   // Recebe o evento quando um jogador se conecta
   socket.on('join', (player) => {
-    players[socket.id] = { position: player.position };
+    players[socket.id] = { position: player.position, angle: player.angle };
         
     // Informa o jogador recém-conectado sobre todos os jogadores existentes
     socket.emit('updatePlayers', players);
@@ -40,9 +40,10 @@ io.on('connection', (socket) => {
   });
 
   // Recebe o evento quando um jogador move a nave
-  socket.on('move', (position) => {
+  socket.on('move', ({ position, angle }) => {
     if (players[socket.id]) {
       players[socket.id].position = position;
+      players[socket.id].angle = angle;
       io.emit('updatePlayers', players);
     }
   });
@@ -50,6 +51,15 @@ io.on('connection', (socket) => {
   // Recebe o evento quando um jogador atira
   socket.on('shoot', (bullet) => {
     io.emit('newBullet', bullet);
+  });
+
+  socket.on('bulletHitEnemy', (data) => {
+    // Lógica para tratar o evento de tiro atingindo o inimigo
+    // Aqui você pode realizar as ações necessárias quando um inimigo é atingido
+    console.log(`Inimigo ${data.enemyId} foi atingido por um tiro`);
+
+    // Emitir um evento específico para o inimigo que foi atingido
+    io.to(data.enemyId).emit('enemyHit', { message: 'Você foi atingido! FIM DE JOGO.' });
   });
 
   socket.on('disconnect', () => {
