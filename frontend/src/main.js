@@ -3,8 +3,8 @@ import io from 'socket.io-client';
 
 const config = {
   type: Phaser.AUTO,
-  width: 800,
-  height: 600,
+  width: 1000,
+  height: 800,
   scene: {
     preload: preload,
     create: create,
@@ -26,7 +26,7 @@ let cursors;
 let bullets;
 let enemies;
 let backgroundImage;
-let scrollSpeed = 2;
+let scrollSpeed = 0.5;
 const players = {}; 
 const playerSprites = {}; 
 let gameOver = false;
@@ -40,16 +40,22 @@ function preload() {
 }
 
 function bulletEnemyCollisionHandler(bullet, enemy) {
+  if (bullet.id === enemy.id) {
+    return false;
+  }
   socket.emit('bulletHitEnemy', { bulletId: bullet.id, enemyId: enemy.id });
   bullet.destroy();
   enemy.destroy();
+  delete playerSprites[enemy.id];
 }
 
 function create() {
   backgroundImage = this.add.tileSprite(0, 0, game.config.width, game.config.height, 'background');
   backgroundImage.setOrigin(0, 0);
 
-  player = this.physics.add.sprite(400, 300, 'ship').setCollideWorldBounds(true);
+  const createPlayer = () => this.physics.add.sprite(400, 300, 'ship').setCollideWorldBounds(true).setScale(0.5)
+
+  player = createPlayer();
   bullets = this.physics.add.group();
   enemies = this.physics.add.group();
 
@@ -74,6 +80,10 @@ function create() {
         const remotePlayerPosition = remotePlayer.position;
         const remotePlayerAngle = remotePlayer.angle;
 
+        if (remotePlayer.isDead) {
+          return;
+        }
+
         // Se a sprite para o jogador já existe, atualize sua posição
         if (playerSprites[playerId]) {
           playerSprites[playerId].x = remotePlayerPosition.x;
@@ -81,7 +91,7 @@ function create() {
           playerSprites[playerId].angle = remotePlayerAngle;
         } else {
           // Se não existe, crie uma nova sprite
-          playerSprites[playerId] = enemies.create(remotePlayerPosition.x, remotePlayerPosition.y, 'ship');
+          playerSprites[playerId] = enemies.create(remotePlayerPosition.x, remotePlayerPosition.y, 'ship').setScale(0.5);
           playerSprites[playerId].id = playerId;
         }
     
@@ -104,6 +114,7 @@ function create() {
   socket.on('newBullet', (bullet) => {
     // Cria um novo tiro
     const newBullet = bullets.create(bullet.x, bullet.y, 'bullet');
+    newBullet.id = bullet.id;
     newBullet.setVelocity(bullet.velocityX, bullet.velocityY);
   });
 
@@ -113,16 +124,24 @@ function create() {
 
     const gameOverText = this.add.text(game.config.width / 2, game.config.height / 2, 'FIM DE JOGO', { fontSize: '32px', fill: '#fff' });
     gameOverText.setOrigin(0.5);
+    const gameOverSubText = this.add.text(game.config.width / 2, game.config.height / 2 + 32, 'Renascendo em 3 segundos', { fontSize: '16px', fill: '#fff' });
+    gameOverSubText.setOrigin(0.5);
     gameOver = true;
     player.destroy();
+
+    setTimeout(() => {
+      gameOverText.destroy();
+      gameOverSubText.destroy();
+      player = createPlayer();
+      gameOver = false;
+    }, 3000);
   });
 
 }
 
 function update() {
   backgroundImage.tilePositionX += scrollSpeed; 
-  player.x -= scrollSpeed
-  
+ 
   if (gameOver) {
     return;
   }
@@ -149,7 +168,8 @@ function update() {
       y: player.y,
       velocityX: Math.cos(player.rotation) * 500,
       velocityY: Math.sin(player.rotation) * 500,
-      direction: player.rotation
+      direction: player.rotation,
+      id: socket.id
     };
     socket.emit('shoot', bullet);
   }
@@ -157,6 +177,7 @@ function update() {
   // Implemente a lógica para enviar a posição da nave para o servidor
   socket.emit('move', {
     position: { x: player.x, y: player.y },
-    angle: player.angle
+    angle: player.angle,
+    isDead: false
   });
 }

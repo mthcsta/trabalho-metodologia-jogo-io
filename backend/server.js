@@ -40,10 +40,11 @@ io.on('connection', (socket) => {
   });
 
   // Recebe o evento quando um jogador move a nave
-  socket.on('move', ({ position, angle }) => {
+  socket.on('move', ({ position, angle, isDead }) => {
     if (players[socket.id]) {
       players[socket.id].position = position;
       players[socket.id].angle = angle;
+      players[socket.id].isDead = isDead;
       io.emit('updatePlayers', players);
     }
   });
@@ -57,6 +58,8 @@ io.on('connection', (socket) => {
     // Lógica para tratar o evento de tiro atingindo o inimigo
     // Aqui você pode realizar as ações necessárias quando um inimigo é atingido
     console.log(`Inimigo ${data.enemyId} foi atingido por um tiro`);
+
+    players[data.enemyId].isDead = true; // Marca o inimigo como morto
 
     // Emitir um evento específico para o inimigo que foi atingido
     io.to(data.enemyId).emit('enemyHit', { message: 'Você foi atingido! FIM DE JOGO.' });
